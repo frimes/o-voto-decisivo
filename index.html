@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <title>O Voto Decisivo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/python-visualization/folium@main/folium/templates/leaflet_heat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-locatecontrol/0.66.2/L.Control.Locate.min.js"></script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-locatecontrol/0.66.2/L.Control.Locate.min.css"/>
+
+    <style>
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #111; overflow: hidden; font-family: sans-serif;}
+        .folium-map { position: fixed; width: 100%; height: 100%; left: 0; top: 0; z-index: 1;}
+        .leaflet-control-locate-popup { display: none !important; }
+        
+        #main-card { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 9999; background: rgba(17, 17, 17, 0.95); padding: 20px; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); border: 1px solid #333; }
+        #chat-container { display: none; position: fixed; bottom: 20px; right: 20px; width: 360px; max-width: calc(100vw - 40px); background: rgba(17, 17, 17, 0.95); border: 1px solid #333; border-radius: 12px; z-index: 10000; box-shadow: 0 8px 32px rgba(0,0,0,0.6); flex-direction: column;}
+        #chat-header { padding: 14px 16px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; color: #fff; }
+        #chat-messages { height: 280px; max-height: 45vh; overflow-y: auto; padding: 14px; color: #ccc; display: flex; flex-direction: column; gap: 10px; }
+        .chat-msg { padding: 9px 13px; border-radius: 8px; max-width: 85%; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-user { background: #2a2a2a; align-self: flex-end; color: #fff; border-bottom-right-radius: 2px; }
+        .msg-bot { background: rgba(0, 176, 155, 0.2); border: 1px solid rgba(0, 176, 155, 0.4); align-self: flex-start; color: #fff; border-bottom-left-radius: 2px; }
+        #chat-input-area { padding: 12px 14px; border-top: 1px solid #333; display: flex; gap: 8px; }
+        #chat-input { flex: 1; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 14px; outline: none; }
+        #btn-enviar { padding: 10px 16px; background: linear-gradient(135deg, #00b09b, #96c93d); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div id="main-card">
+        <h2 style="margin: 0 0 10px 0; font-size: 22px; color: #ff4444; font-weight: 800; text-align: center; text-transform: uppercase; letter-spacing: 1px;">O Voto Decisivo</h2>
+        <p style="margin: 0 0 15px 0; font-size: 14px; line-height: 1.5; color: #cccccc; text-align: center;">
+            O voto que decide o <b>Brasil</b> está escondido nas manchas vermelhas. É lá que o resgate é urgente.<br><br>
+            <i style="color: #888;">📍 Permita a localização no seu celular para dar zoom automático na sua área.</i>
+        </p>
+        <button id="btn-gerar" style="display: block; width: 100%; padding: 15px; background: linear-gradient(135deg, #00b09b, #96c93d); color: #fff; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 4px 15px rgba(0, 176, 155, 0.4);">
+            🧭 Gerar Argumentos pra minha Área
+        </button>
+    </div>
+
+    <div class="folium-map" id="map_8d7ca5871666d533521eb194c1c807ee"></div>
+
+    <div id="chat-container">
+        <div id="chat-header">
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700;">Argumentador Local</h3>
+            <button id="btn-fechar-chat" style="background: none; border: none; color: #ff4444; font-size: 22px; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div id="chat-messages">
+            <div class="chat-msg msg-bot">Fala aí! O mapa mostra o cenário de todo o país, mas a eleição a gente decide mesmo é no nosso bairro. Pra eu preparar o melhor papo de mobilização, me conte: <b>qual é a sua região e o maior problema por aí?</b></div>
+        </div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ex: Tijuca, falta de segurança...">
+            <button id="btn-enviar">Enviar</button>
+        </div>
+    </div>
+
+<script>
+    var map_8d7ca5871666d533521eb194c1c807ee = L.map(
+        "map_8d7ca5871666d533521eb194c1c807ee",
+        { center: [-15.78, -47.92], crs: L.CRS.EPSG3857, zoom: 5, zoomControl: true, preferCanvas: false }
+    );
+
+    var tile_layer_f26ca9f6aac0bbdd3816c2de62796176 = L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        { minZoom: 0, maxZoom: 18, maxNativeZoom: 18, noWrap: false, attribution: "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ", subdomains: "abc", detectRetina: false, tms: false, opacity: 1 }
+    );
+    tile_layer_f26ca9f6aac0bbdd3816c2de62796176.addTo(map_8d7ca5871666d533521eb194c1c807ee);
+
+    // =======================================================================
+    // DADOS CARREGADOS VIA FETCH
+    // =======================================================================
+    
+    var heatOptions = {
+        "minOpacity": 0.5,
+        "maxZoom": 18,
+        "radius": 15,
+        "blur": 15,
+        "gradient": null
+    };
+    
+    var heat_map_4a2c511b42bf1c191e450824d43d1271 = L.heatLayer([], heatOptions).addTo(map_8d7ca5871666d533521eb194c1c807ee);
+
+    async function carregarDadosMapaNacional() {
+        console.log("[mapa] A iniciar carregamento do dados_mapa.json...");
+        
+        if (window.location.protocol === 'file:') {
+            console.error("[mapa] ❌ ERRO CORS: Estás a abrir o ficheiro localmente (file://). O mapa não vai carregar as manchas vermelhas por segurança do navegador. Usa um servidor local (ex: python -m http.server 8000).");
+            return;
+        }
+
+        try {
+            const response = await fetch('dados_mapa.json');
+            
+            console.log(`[mapa] Resposta recebida. Status: ${response.status}`);
+            
+            if (!response.ok) {
+                throw new Error(`Erro HTTP! Status: ${response.status}`);
+            }
+
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("text/html") !== -1) {
+                 throw new Error("O servidor devolveu HTML em vez de JSON. Verifica se o dados_mapa.json está na mesma pasta.");
+            }
+
+            const dados = await response.json();
+            
+            if (!Array.isArray(dados) || dados.length === 0) {
+                 throw new Error("O ficheiro JSON está vazio ou não é um array válido.");
+            }
+            
+            console.log(`[mapa] ${dados.length} pontos recebidos do JSON. A injetar no heatLayer...`);
+            heat_map_4a2c511b42bf1c191e450824d43d1271.setLatLngs(dados);
+            console.log("[mapa] ✅ Heatmap nacional atualizado com sucesso.");
+
+        } catch (error) {
+            console.error("[mapa] ❌ Falha ao carregar os dados de calor:", error);
+        }
+    }
+
+    carregarDadosMapaNacional();
+
+    // =======================================================================
+    // FIM DOS DADOS CARREGADOS VIA FETCH
+    // =======================================================================
+
+    // --- ATIVAÇÃO DO GPS ---
+    var lc = L.control.locate({
+        position: 'topleft',
+        flyTo: true,
+        strings: { title: 'A minha localização' },
+        locateOptions: { maxZoom: 14, enableHighAccuracy: true }
+    }).addTo(map_8d7ca5871666d533521eb194c1c807ee);
+
+    lc.start();
+
+    map_8d7ca5871666d533521eb194c1c807ee.on('locationfound', function() {
+        var mainCard = document.getElementById('main-card');
+        if(mainCard) mainCard.style.display = 'none';
+        var chatCont = document.getElementById('chat-container');
+        if (chatCont) chatCont.style.display = 'flex';
+        var chatInp = document.getElementById('chat-input');
+        if(chatInp) chatInp.focus();
+    });
+
+    // --- LÓGICA DO CHAT E WHATSAPP COM INTEGRAÇÃO ---
+    const _origAlert = window.alert;
+    window.alert = function(msg) {
+        if(typeof msg === 'string' && msg.toLowerCase().includes('geolocation')) {
+            console.warn('GPS silenciado.');
+            return;
+        }
+        _origAlert(msg);
+    };
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const btnGerar = document.getElementById('btn-gerar');
+        const chatContainer = document.getElementById('chat-container');
+        const btnFechar = document.getElementById('btn-fechar-chat');
+        const btnEnviar = document.getElementById('btn-enviar');
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const mainCard = document.getElementById('main-card'); 
+
+        btnGerar.addEventListener('click', function() {
+            chatContainer.style.display = 'flex';
+            if(mainCard) mainCard.style.display = 'none';
+            chatInput.focus();
+        });
+
+        btnFechar.addEventListener('click', function() {
+            chatContainer.style.display = 'none';
+            if(mainCard) mainCard.style.display = 'block';
+        });
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('chat-msg', sender === 'user' ? 'msg-user' : 'msg-bot');
+            msgDiv.innerHTML = text; 
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if(text !== "") {
+                addMessage(text, 'user');
+                chatInput.value = '';
+
+                const msgWaitId = "wait-" + Date.now();
+                const msgWait = document.createElement('div');
+                msgWait.id = msgWaitId;
+                msgWait.classList.add('chat-msg', 'msg-bot');
+                msgWait.innerHTML = "A analisar a região e a gerar argumento decisivo...";
+                chatMessages.appendChild(msgWait);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: [{ role: 'user', content: text }]
+                        })
+                    });
+
+                    if (!response.ok) throw new Error("Erro na rede");
+
+                    const data = await response.json();
+                    const respostaGroq = data.choices[0].message.content;
+
+                    document.getElementById(msgWaitId).remove();
+                    
+                    const zapLink = `https://api.whatsapp.com/send?text=${encodeURIComponent(respostaGroq)}`;
+                    
+                    const visualBot = `Aqui está o argumento pronto para a sua área:<br><br>
+                    <div style="background:#1a1a1a; padding:12px; border-radius:6px; border:1px solid #444; font-style:italic; color:#fff; white-space: pre-wrap;">${respostaGroq}</div>
+                    <a href="${zapLink}" target="_blank" style="display: block; margin-top: 12px; padding: 10px; background: #25D366; color: #fff; text-decoration: none; border-radius: 6px; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
+                        📲 Compartilhar no WhatsApp
+                    </a>`;
+                    
+                    addMessage(visualBot, 'bot');
+
+                } catch (error) {
+                    if(document.getElementById(msgWaitId)) document.getElementById(msgWaitId).remove();
+                    addMessage("Ocorreu um erro de ligação ao servidor. Tente novamente.", 'bot');
+                }
+            }
+        }
+
+        btnEnviar.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', function(e) {
+            if(e.key === 'Enter') sendMessage();
+        });
+    });
+</script>
+</body>
+</html>
