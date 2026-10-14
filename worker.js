@@ -1,20 +1,23 @@
-const SYSTEM_PROMPT = `Você é um gerador de mensagens curtas de engajamento no WhatsApp para o 2º turno das eleições presidenciais do Brasil. O usuário enviará uma [Cidade/Estado/Bairro] e um [Problema].
+const SYSTEM_PROMPT = `Você é um gerador de mensagens curtas de engajamento no WhatsApp para o 2º turno da eleição presidencial do Brasil. O usuário enviará uma [Cidade/Estado/Bairro] e um [Problema].
 
-A sua ÚNICA função é entregar a mensagem pronta para ser partilhada, sem introduções ou conversas extras. O output tem de ser exclusivamente a mensagem gerada. Não faça menção às abstenções, foque-se no engajamento para a escolha do presidente.
+A sua ÚNICA função é entregar a mensagem pronta para ser partilhada, sem introduções ou conversas extras. O output tem de ser exclusivamente a mensagem gerada. Não faça menção às abstenções; foque-se no engajamento para a escolha do presidente.
 
-REGRAS ESTILO E CONTEXTO:
-- Linguagem direta, de rua, gerando empatia e focada na urgência do voto.
-- O tom é de vizinho a mobilizar a sua rede: "Galera", "pessoal", "bora".
-- NUNCA referencie governadores, autarcas, deputados ou prefeitos. A eleição atual é PRESIDENCIAL.
-- Contextualize o problema local indicando que a solução passa por políticas e investimentos federais estruturais.
-- Estruture a mensagem em 2 ou 3 parágrafos muito curtos para leitura rápida no telemóvel.
+REGRAS DE ESTILO E CONTEXTO:
+- Linguagem direta e acessível, gerando empatia e focada na urgência do voto.
+- O tom é de vizinho a mobilizar a sua rede: "Galera", "pessoal", "vamos juntos".
+- A eleição atual é EXCLUSIVAMENTE PRESIDENCIAL. NUNCA referencie governadores, deputados, prefeitos ou vereadores.
+- Adapte dinamicamente o tom e cite o problema local de forma concreta e natural, sempre com base no bairro/cidade/estado informado pelo usuário.
+- Aborde temas pragmáticos e universais do cenário nacional (ex: saúde, educação, emprego, segurança, custo de vida), mostrando que a solução passa por políticas e investimentos federais estruturais.
+- Estruture a mensagem em 2 ou 3 parágrafos muito curtos para leitura rápida no celular.
 - Use um ou dois emojis moderados (ex: 🚨, 👊, 🗳️).
 
 RODAPÉ (OBRIGATÓRIO):
 A ÚLTIMA linha da resposta, com um espaço em branco antes, tem de ser obrigatoriamente:
 "📍 Veja como tá a situação da sua região e faça sua parte: https://ovotodecisivo.com"`;
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+
+const SERVER_BUSY_MESSAGE = 'Opa! Nosso servidor está sobrecarregado no momento. 😅 A disputa está acirrada, aguarde 1 minuto e tente novamente.';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -56,39 +59,46 @@ async function handleChat(request, env) {
     ...userMessages,
   ];
 
-  let groqResponse;
+  let deepseekResponse;
   try {
-    groqResponse = await fetch(GROQ_API_URL, {
+    deepseekResponse = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model: 'deepseek-chat',
         messages,
         temperature: 0.8,
         max_tokens: 2000,
       }),
     });
   } catch (err) {
-    return jsonError(`Erro ao contactar a API do Groq: ${err.message}`, 502);
+    return chatResponse(SERVER_BUSY_MESSAGE);
   }
 
-  if (!groqResponse.ok) {
-    const errBody = await groqResponse.text();
-    return new Response(errBody, {
-      status: groqResponse.status,
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-    });
+  if (!deepseekResponse.ok) {
+    return chatResponse(SERVER_BUSY_MESSAGE);
   }
 
-  const data = await groqResponse.json();
+  const data = await deepseekResponse.json();
 
   return new Response(JSON.stringify(data), {
     status: 200,
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
+}
+
+// Devolve uma resposta no formato de sucesso do modelo (status 200) para que o
+// front-end exiba a mensagem amigável normalmente, sem precisar ser alterado.
+function chatResponse(content) {
+  return new Response(
+    JSON.stringify({
+      choices: [{ message: { role: 'assistant', content } }],
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
+  );
 }
 
 function jsonError(message, status) {

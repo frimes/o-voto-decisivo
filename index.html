@@ -49,6 +49,10 @@
         #chat-input-area { padding: 12px 14px; border-top: 1px solid #333; display: flex; gap: 8px; }
         #chat-input { flex: 1; padding: 10px 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 14px; outline: none; }
         #btn-enviar { padding: 10px 16px; background: linear-gradient(135deg, #00b09b, #96c93d); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; text-transform: uppercase; }
+
+        .map-legend { position: absolute; bottom: 30px; left: 15px; z-index: 999; background: rgba(17, 17, 17, 0.85); border: 1px solid #333; border-radius: 8px; padding: 10px 15px; color: #ccc; font-size: 12px; font-family: sans-serif; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(4px); width: 150px; pointer-events: none; }
+        .legend-gradient { width: 100%; height: 8px; background: linear-gradient(to right, blue, lime, yellow, red); margin: 8px 0; border-radius: 4px; }
+        .legend-labels { display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; text-transform: uppercase; }
     </style>
 </head>
 <body>
@@ -64,6 +68,8 @@
     </div>
 
     <div class="folium-map" id="map_8d7ca5871666d533521eb194c1c807ee"></div>
+
+    <div class="map-legend"><div style="text-align: center; margin-bottom: 2px; font-weight: bold; color: #fff;">Abstenção</div><div class="legend-gradient"></div><div class="legend-labels"><span style="color: #6699ff;">Baixa</span><span style="color: #ff4444;">Crítica</span></div></div>
 
     <div id="chat-container">
         <div id="chat-header">
@@ -148,23 +154,42 @@
     // FIM DOS DADOS CARREGADOS VIA FETCH
     // =======================================================================
 
-    // --- ATIVAÇÃO DO GPS ---
+    // --- ATIVAÇÃO DO GPS (JORNADA CINEMATOGRÁFICA) ---
     var lc = L.control.locate({
         position: 'topleft',
-        flyTo: true,
+        flyTo: false, // Desativamos o voo automático para controlarmos o tempo
+        setView: false, // Não muda a câmera imediatamente
         strings: { title: 'A minha localização' },
         locateOptions: { maxZoom: 14, enableHighAccuracy: true }
     }).addTo(map_8d7ca5871666d533521eb194c1c807ee);
 
-    lc.start();
+    lc.start(); // Pede o GPS
 
-    map_8d7ca5871666d533521eb194c1c807ee.on('locationfound', function() {
-        var mainCard = document.getElementById('main-card');
-        if(mainCard) mainCard.style.display = 'none';
-        var chatCont = document.getElementById('chat-container');
-        if (chatCont) chatCont.style.display = 'flex';
-        var chatInp = document.getElementById('chat-input');
-        if(chatInp) chatInp.focus();
+    map_8d7ca5871666d533521eb194c1c807ee.on('locationfound', function(e) {
+        console.log("GPS autorizado. Iniciando delay de leitura de 6s...");
+
+        // Aguarda 6 segundos para o usuário ler o cartão inicial
+        setTimeout(function() {
+            console.log("Iniciando voo para o bairro...");
+            // Voo suave até o bairro
+            map_8d7ca5871666d533521eb194c1c807ee.flyTo(e.latlng, 14, {
+                animate: true,
+                duration: 3 // Voo dura 3 segundos
+            });
+
+            // Assim que o voo termina (3s depois), esconde cartão e abre chat
+            setTimeout(function() {
+                var mainCard = document.getElementById('main-card');
+                if(mainCard) mainCard.style.display = 'none';
+
+                var chatCont = document.getElementById('chat-container');
+                if (chatCont) chatCont.style.display = 'flex';
+
+                var chatInp = document.getElementById('chat-input');
+                if(chatInp) chatInp.focus();
+            }, 3000);
+
+        }, 6000);
     });
 
     // --- LÓGICA DO CHAT E WHATSAPP COM INTEGRAÇÃO ---
