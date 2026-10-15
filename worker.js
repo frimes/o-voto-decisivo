@@ -10,6 +10,7 @@ REGRAS DE ESTILO E CONTEXTO:
 - Aborde temas pragmáticos e universais do cenário nacional (ex: saúde, educação, emprego, segurança, custo de vida), mostrando que a solução passa por políticas e investimentos federais estruturais.
 - Estruture a mensagem em 2 ou 3 parágrafos muito curtos para leitura rápida no celular.
 - Use um ou dois emojis moderados (ex: 🚨, 👊, 🗳️).
+- Escreva em português do Brasil. Diga "segundo turno", nunca "segunda volta". Interprete gírias no sentido usado no Brasil (ex.: "trombadinha" = batedor de carteira, "cracudo" = usuário de crack).
 - Não invente números, dados ou promessas específicas. Não atribua ao presidente responsabilidade direta por serviços municipais ou estaduais; fale de políticas federais de forma geral.
 
 RODAPÉ (OBRIGATÓRIO):
@@ -18,6 +19,13 @@ A resposta termina obrigatoriamente com estas duas linhas, nesta ordem, com um e
 "🤖 Mensagem criada com ajuda de IA"`;
 
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
+const CLOUDFLARE_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+const DEEPSEEK_TIMEOUT_MS = 15000;
+const GROQ_TIMEOUT_MS = 10000;
+const MAX_TOKENS = 400;
+const TEMPERATURE = 0.8;
 
 const SERVER_BUSY_MESSAGE = 'Opa! Nosso servidor está sobrecarregado no momento. 😅 A disputa está acirrada, aguarde 1 minuto e tente novamente.';
 
@@ -93,31 +101,85 @@ async function handleChat(request, env, cors) {
     ...sanitized,
   ];
 
-  let deepseekResponse;
+  // Cadeia de fallback: DeepSeek -> Cloudflare Workers AI -> Groq -> busy.
+  // 1. DeepSeek
+  const deepseek = await callChatProvider({
+    name: 'deepseek',
+    url: DEEPSEEK_API_URL,
+    apiKey: env.DEEPSEEK_API_KEY,
+    model: 'deepseek-chat',
+    messages,
+    timeoutMs: DEEPSEEK_TIMEOUT_MS,
+  });
+  if (deepseek.ok) {
+    return jsonOk(deepseek.data, cors);
+  }
+
+  // 2. Cloudflare Workers AI
   try {
-    deepseekResponse = await fetch(DEEPSEEK_API_URL, {
+    const aiResult = await env.AI.run(CLOUDFLARE_AI_MODEL, {
+      messages,
+      max_tokens: MAX_TOKENS,
+    });
+    console.log('PROVIDER', 'cloudflare-ai');
+    const content = aiResult && aiResult.response;
+    return jsonOk({ choices: [{ message: { content } }] }, cors);
+  } catch (err) {
+    console.log('FAIL', 'cloudflare-ai', (err && err.name) || 'network_error');
+  }
+
+  // 3. Groq
+  const groq = await callChatProvider({
+    name: 'groq',
+    url: GROQ_API_URL,
+    apiKey: env.GROQ_API_KEY,
+    model: GROQ_MODEL,
+    messages,
+    timeoutMs: GROQ_TIMEOUT_MS,
+  });
+  if (groq.ok) {
+    return jsonOk(groq.data, cors);
+  }
+
+  // 4. Todos os provedores falharam.
+  return chatResponse(SERVER_BUSY_MESSAGE, true, cors, 'all_providers_failed');
+}
+
+// Chama um provedor compatível com a API OpenAI. Registra 'PROVIDER' quando
+// responde com sucesso e 'FAIL' (com o status ou nome do erro) em qualquer
+// falha de rede, timeout ou status não-ok. Devolve { ok, data }.
+async function callChatProvider({ name, url, apiKey, model, messages, timeoutMs }) {
+  let response;
+  try {
+    response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model,
         messages,
-        temperature: 0.8,
-        max_tokens: 400,
+        temperature: TEMPERATURE,
+        max_tokens: MAX_TOKENS,
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
-    return chatResponse(SERVER_BUSY_MESSAGE, true, cors, 'network_error');
+    console.log('FAIL', name, (err && err.name) || 'network_error');
+    return { ok: false };
   }
 
-  if (!deepseekResponse.ok) {
-    return chatResponse(SERVER_BUSY_MESSAGE, true, cors, deepseekResponse.status);
+  if (!response.ok) {
+    console.log('FAIL', name, response.status);
+    return { ok: false };
   }
 
-  const data = await deepseekResponse.json();
+  console.log('PROVIDER', name);
+  return { ok: true, data: await response.json() };
+}
 
+function jsonOk(data, cors) {
   return new Response(JSON.stringify(data), {
     status: 200,
     headers: { 'Content-Type': 'application/json', ...cors },
