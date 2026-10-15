@@ -260,13 +260,18 @@
 
                     document.getElementById(msgWaitId).remove();
                     
-                    const zapLink = `https://api.whatsapp.com/send?text=${encodeURIComponent(respostaGroq)}`;
-                    
-                    const visualBot = `Aqui está o argumento pronto para a sua área:<br><br>
-                    <div style="background:#1a1a1a; padding:12px; border-radius:6px; border:1px solid #444; font-style:italic; color:#fff; white-space: pre-wrap;">${respostaGroq}</div>
-                    <a href="${zapLink}" target="_blank" style="display: block; margin-top: 12px; padding: 10px; background: #25D366; color: #fff; text-decoration: none; border-radius: 6px; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
-                        📲 Compartilhar no WhatsApp
-                    </a>`;
+                    let visualBot;
+                    if (data.busy === true) {
+                        visualBot = respostaGroq;
+                    } else {
+                        const zapLink = `https://api.whatsapp.com/send?text=${encodeURIComponent(respostaGroq)}`;
+                        
+                        visualBot = `Aqui está o argumento pronto para a sua área:<br><br>
+                        <div style="background:#1a1a1a; padding:12px; border-radius:6px; border:1px solid #444; font-style:italic; color:#fff; white-space: pre-wrap;">${respostaGroq}</div>
+                        <a href="${zapLink}" target="_blank" style="display: block; margin-top: 12px; padding: 10px; background: #25D366; color: #fff; text-decoration: none; border-radius: 6px; text-align: center; font-weight: bold; box-shadow: 0 4px 10px rgba(37, 211, 102, 0.3);">
+                            📲 Compartilhar no WhatsApp
+                        </a>`;
+                    }
                     
                     addMessage(visualBot, 'bot');
 
